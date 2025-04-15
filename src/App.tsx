@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { supabase } from './supabaseClient';
+import type { User } from '@supabase/supabase-js';
 
 type Device = {
   id: string;
@@ -13,7 +14,7 @@ function App() {
   const [password, setPassword] = useState('');
   const [isLogin, setIsLogin] = useState(true);
   const [message, setMessage] = useState('');
-  const [user, setUser] = useState<any>(null);
+  const [user, setUser] = useState<User | null>(null);
 
   // Device management state
   const [devices, setDevices] = useState<Device[]>([]);
@@ -21,14 +22,14 @@ function App() {
   const [loadingDevices, setLoadingDevices] = useState(false);
 
   useEffect(() => {
-    const session = supabase.auth.getSession().then(({ data }) => {
+    supabase.auth.getSession().then(({ data }) => {
       setUser(data.session?.user ?? null);
     });
-    const { data: listener } = supabase.auth.onAuthStateChange((_event, session) => {
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
       setUser(session?.user ?? null);
     });
     return () => {
-      listener.subscription.unsubscribe();
+      subscription.unsubscribe();
     };
   }, []);
 
@@ -42,6 +43,7 @@ function App() {
   }, [user]);
 
   const fetchDevices = async () => {
+    if (!user) return;
     setLoadingDevices(true);
     const { data, error } = await supabase
       .from('devices')
@@ -54,7 +56,7 @@ function App() {
 
   const handleAddDevice = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!deviceName.trim()) return;
+    if (!deviceName.trim() || !user) return;
     const { error } = await supabase.from('devices').insert([
       {
         name: deviceName,
